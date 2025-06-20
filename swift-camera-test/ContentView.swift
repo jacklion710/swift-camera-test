@@ -125,11 +125,29 @@ struct CameraView: View {
             if viewModel.isCameraAuthorized {
                 VStack {
                     // Camera preview in a box
-                    CameraPreview(session: viewModel.session)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                        .padding(.horizontal, 20)
-                        .padding(.top, 40)
+                    ZStack {
+                        CameraPreview(session: viewModel.session)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        
+                        // Fixed overlay rectangle with 480:320 aspect ratio
+                        GeometryReader { geometry in
+                            let maxWidth = geometry.size.width * 0.8 // Use 80% of available width
+                            let width = maxWidth
+                            let height = width * (320.0/480.0) // maintain 480:320 aspect ratio
+                            
+                            Rectangle()
+                                .strokeBorder(Color.gray.opacity(0.8), 
+                                    style: StrokeStyle(
+                                        lineWidth: 2,
+                                        dash: [5]
+                                    ))
+                                .frame(width: width, height: height)
+                                .position(x: geometry.size.width/2, y: geometry.size.height/2)
+                        }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .padding(.horizontal, 20)
+                    .padding(.top, 40)
                     
                     Spacer()
                     
@@ -146,36 +164,15 @@ struct CameraView: View {
                 }
             } else {
                 VStack {
-                    Spacer()
-                    
-                    // Permission request UI in a box
-                    VStack(spacing: 20) {
-                        Image(systemName: "camera.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(.white)
-                        
-                        Text("Camera Access Required")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
-                        
-                        Text("Please enable camera access in Settings to use this app.")
-                            .multilineTextAlignment(.center)
-                            .foregroundColor(.gray)
-                            .padding(.horizontal)
-                    }
-                    .padding(40)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(Color.black.opacity(0.8))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 20)
-                                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                            )
-                    )
-                    .padding(.horizontal, 40)
-                    
-                    Spacer()
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 60))
+                        .foregroundColor(.gray)
+                    Text("Camera Access Required")
+                        .font(.title2)
+                        .padding()
+                    Text("Please enable camera access in Settings to use this app.")
+                        .multilineTextAlignment(.center)
+                        .padding()
                 }
             }
         }
