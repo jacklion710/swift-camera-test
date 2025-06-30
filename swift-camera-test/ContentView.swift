@@ -156,20 +156,25 @@ class CameraViewModel: NSObject, ObservableObject {
             return
         }
         
-        // Compare with reference image
-        let matchScore = compareWithReference(croppedImage)
-        
-        // Update smoothed match quality
-        recentMatches.append(matchScore)
-        if recentMatches.count > matchBufferSize {
-            recentMatches.removeFirst()
-        }
-        
-        let smoothedQuality = recentMatches.reduce(0, +) / Float(recentMatches.count)
-        
-        DispatchQueue.main.async {
-            self.matchQuality = smoothedQuality
-            self.isMatchingTarget = smoothedQuality >= self.imageMatchThreshold
+        // Process image comparison on background queue
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            
+            // Compare with reference image
+            let matchScore = self.compareWithReference(croppedImage)
+            
+            // Update smoothed match quality on main queue
+            DispatchQueue.main.async {
+                self.recentMatches.append(matchScore)
+                if self.recentMatches.count > self.matchBufferSize {
+                    self.recentMatches.removeFirst()
+                }
+                
+                let smoothedQuality = self.recentMatches.reduce(0, +) / Float(self.recentMatches.count)
+                
+                self.matchQuality = smoothedQuality
+                self.isMatchingTarget = smoothedQuality >= self.imageMatchThreshold
+            }
         }
     }
     
@@ -192,12 +197,30 @@ class CameraViewModel: NSObject, ObservableObject {
         let croppedUIImage = UIImage(cgImage: croppedImage)
         let referenceUIImage = UIImage(cgImage: referenceCGImage)
         
-        // Use ORB matching
-        let matchScore = Float(OpenCVWrapper.matchImagesORB(croppedUIImage, with: referenceUIImage))
+        // Use enhanced ORB matching with preprocessing
+        guard let result = OpenCVWrapper.compareImages(croppedUIImage, with: referenceUIImage) else {
+            print("Error: Failed to get comparison results")
+            return 0.0
+        }
         
-        print("ORB Match Score: \(String(format: "%.3f", matchScore))")
+        // Extract score and normalize to 0-1 range
+        let score = (result["score"] as? NSNumber)?.floatValue ?? 0.0
+        let normalizedScore = score / 100.0
         
-        return matchScore
+        // Log detailed matching information
+        print("Match Details:")
+        print("Score: \(String(format: "%.2f", score))%")
+        print("Matches: \(result["matches"] as? Int ?? 0)")
+        print("Structural Similarity: \(String(format: "%.3f", result["structuralSimilarity"] as? Double ?? 0.0))")
+        print("Spatial Score: \(String(format: "%.3f", result["spatialScore"] as? Double ?? 0.0))")
+        print("Is Reference Render: \(result["isRender1"] as? Bool ?? false)")
+        print("Is Camera Render: \(result["isRender2"] as? Bool ?? false)")
+        
+        if let error = result["error"] as? String {
+            print("Warning: \(error)")
+        }
+        
+        return normalizedScore
     }
     
     private func resizeImage(_ image: CGImage, to size: CGSize) -> CGImage? {
