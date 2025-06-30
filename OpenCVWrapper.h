@@ -6,11 +6,8 @@
 //
 
 #import <Foundation/Foundation.h>
-
-NS_ASSUME_NONNULL_BEGIN
+#import <UIKit/UIKit.h>
 
 @interface OpenCVWrapper : NSObject
-
++ (double)matchImagesORB:(UIImage *)image1 with:(UIImage *)image2;
 @end
-
-NS_ASSUME_NONNULL_END

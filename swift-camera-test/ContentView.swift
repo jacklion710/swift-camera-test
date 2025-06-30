@@ -45,7 +45,7 @@ class CameraViewModel: NSObject, ObservableObject {
     private let minimumFrameInterval: TimeInterval = 0.1 // 100ms between analyses
     
     // Pattern matching parameters
-    private var imageMatchThreshold: Float = 0.4  // More realistic threshold
+    private var imageMatchThreshold: Float = 0.15  // Lower threshold for ORB matching (15% feature matches)
     private var recentMatches: [Float] = []
     private let matchBufferSize = 10
     
@@ -188,26 +188,16 @@ class CameraViewModel: NSObject, ObservableObject {
     private func compareWithReference(_ croppedImage: CGImage) -> Float {
         guard let referenceCGImage = referenceImage.cgImage else { return 0.0 }
         
-        // Resize both images to same size for comparison
-        let targetSize = CGSize(width: 240, height: 160) // Small size for fast comparison
+        // Convert CGImages to UIImages for OpenCV processing
+        let croppedUIImage = UIImage(cgImage: croppedImage)
+        let referenceUIImage = UIImage(cgImage: referenceCGImage)
         
-        guard let resizedCropped = resizeImage(croppedImage, to: targetSize),
-              let resizedReference = resizeImage(referenceCGImage, to: targetSize) else {
-            print("Failed to resize images")
-            return 0.0
-        }
+        // Use ORB matching
+        let matchScore = Float(OpenCVWrapper.matchImagesORB(croppedUIImage, with: referenceUIImage))
         
-        // Compare specific features of the PM5544 pattern
-        let colorBarScore = compareColorBars(resizedCropped, reference: resizedReference)
-        let structuralScore = compareStructuralFeatures(resizedCropped, reference: resizedReference)
-        let edgeScore = compareEdgeFeatures(resizedCropped, reference: resizedReference)
+        print("ORB Match Score: \(String(format: "%.3f", matchScore))")
         
-        // More forgiving weighted combination
-        let finalScore = (colorBarScore * 0.5) + (structuralScore * 0.3) + (edgeScore * 0.2)
-        
-        print("Scores - Color: \(String(format: "%.3f", colorBarScore)), Structural: \(String(format: "%.3f", structuralScore)), Edge: \(String(format: "%.3f", edgeScore)), Final: \(String(format: "%.3f", finalScore))")
-        
-        return finalScore
+        return matchScore
     }
     
     private func resizeImage(_ image: CGImage, to size: CGSize) -> CGImage? {
