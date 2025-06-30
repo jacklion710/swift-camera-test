@@ -6,6 +6,16 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		FC965A172E1317B7000C6E48 /* opencv2.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FC965A162E1317B7000C6E48 /* opencv2.framework */; };
+		FC965A1A2E1318FC000C6E48 /* AssetsLibrary.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FC965A192E1318FB000C6E48 /* AssetsLibrary.framework */; };
+		FC965A1C2E131905000C6E48 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FC965A1B2E131905000C6E48 /* CoreGraphics.framework */; };
+		FC965A1E2E131917000C6E48 /* CoreMedia.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FC965A1D2E131917000C6E48 /* CoreMedia.framework */; };
+		FC965A202E13191F000C6E48 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FC965A1F2E13191F000C6E48 /* CoreFoundation.framework */; };
+		FC965A222E131927000C6E48 /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FC965A212E131927000C6E48 /* Accelerate.framework */; };
+		FC965A282E131EEB000C6E48 /* OpenCVWrapper.mm in Sources */ = {isa = PBXBuildFile; fileRef = FC965A272E131EEB000C6E48 /* OpenCVWrapper.mm */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		FCAAD8B52E04F87F00C73031 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -24,6 +34,16 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		FC965A162E1317B7000C6E48 /* opencv2.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = opencv2.framework; sourceTree = "<group>"; };
+		FC965A192E1318FB000C6E48 /* AssetsLibrary.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AssetsLibrary.framework; path = System/Library/Frameworks/AssetsLibrary.framework; sourceTree = SDKROOT; };
+		FC965A1B2E131905000C6E48 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		FC965A1D2E131917000C6E48 /* CoreMedia.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMedia.framework; path = System/Library/Frameworks/CoreMedia.framework; sourceTree = SDKROOT; };
+		FC965A1F2E13191F000C6E48 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
+		FC965A212E131927000C6E48 /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
+		FC965A252E131EEA000C6E48 /* swift-camera-test-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "swift-camera-test-Bridging-Header.h"; sourceTree = "<group>"; };
+		FC965A262E131EEB000C6E48 /* OpenCVWrapper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OpenCVWrapper.h; sourceTree = "<group>"; };
+		FC965A272E131EEB000C6E48 /* OpenCVWrapper.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = OpenCVWrapper.mm; sourceTree = "<group>"; };
+		FC965A292E132382000C6E48 /* PrefixHeader.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PrefixHeader.pch; sourceTree = "<group>"; };
 		FCAAD8A42E04F87D00C73031 /* swift-camera-test.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "swift-camera-test.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		FCAAD8B42E04F87F00C73031 /* swift-camera-testTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "swift-camera-testTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		FCAAD8BE2E04F87F00C73031 /* swift-camera-testUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "swift-camera-testUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -52,6 +72,12 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FC965A222E131927000C6E48 /* Accelerate.framework in Frameworks */,
+				FC965A202E13191F000C6E48 /* CoreFoundation.framework in Frameworks */,
+				FC965A1E2E131917000C6E48 /* CoreMedia.framework in Frameworks */,
+				FC965A1C2E131905000C6E48 /* CoreGraphics.framework in Frameworks */,
+				FC965A1A2E1318FC000C6E48 /* AssetsLibrary.framework in Frameworks */,
+				FC965A172E1317B7000C6E48 /* opencv2.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -72,13 +98,31 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		FC965A182E1318FB000C6E48 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				FC965A212E131927000C6E48 /* Accelerate.framework */,
+				FC965A1F2E13191F000C6E48 /* CoreFoundation.framework */,
+				FC965A1D2E131917000C6E48 /* CoreMedia.framework */,
+				FC965A1B2E131905000C6E48 /* CoreGraphics.framework */,
+				FC965A192E1318FB000C6E48 /* AssetsLibrary.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		FCAAD89B2E04F87D00C73031 = {
 			isa = PBXGroup;
 			children = (
+				FC965A262E131EEB000C6E48 /* OpenCVWrapper.h */,
+				FC965A272E131EEB000C6E48 /* OpenCVWrapper.mm */,
 				FCAAD8A62E04F87D00C73031 /* swift-camera-test */,
 				FCAAD8B72E04F87F00C73031 /* swift-camera-testTests */,
 				FCAAD8C12E04F87F00C73031 /* swift-camera-testUITests */,
 				FCAAD8A52E04F87D00C73031 /* Products */,
+				FC965A162E1317B7000C6E48 /* opencv2.framework */,
+				FC965A182E1318FB000C6E48 /* Frameworks */,
+				FC965A252E131EEA000C6E48 /* swift-camera-test-Bridging-Header.h */,
+				FC965A292E132382000C6E48 /* PrefixHeader.pch */,
 			);
 			sourceTree = "<group>";
 		};
@@ -175,6 +219,7 @@
 				TargetAttributes = {
 					FCAAD8A32E04F87D00C73031 = {
 						CreatedOnToolsVersion = 16.2;
+						LastSwiftMigration = 1620;
 					};
 					FCAAD8B32E04F87F00C73031 = {
 						CreatedOnToolsVersion = 16.2;
@@ -236,6 +281,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FC965A282E131EEB000C6E48 /* OpenCVWrapper.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -311,6 +357,7 @@
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREFIX_HEADER = "$(SRCROOT)/PrefixHeader.pch";
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"DEBUG=1",
 					"$(inherited)",
@@ -372,6 +419,7 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_PREFIX_HEADER = "$(SRCROOT)/PrefixHeader.pch";
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
@@ -393,11 +441,16 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"swift-camera-test/Preview Content\"";
 				DEVELOPMENT_TEAM = 84KWJ3HCR4;
 				ENABLE_PREVIEWS = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs access to camera to take photos.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -413,6 +466,8 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "vector.swift-camera-test";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "swift-camera-test-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -423,11 +478,16 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"swift-camera-test/Preview Content\"";
 				DEVELOPMENT_TEAM = 84KWJ3HCR4;
 				ENABLE_PREVIEWS = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs access to camera to take photos.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -443,6 +503,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "vector.swift-camera-test";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "swift-camera-test-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
