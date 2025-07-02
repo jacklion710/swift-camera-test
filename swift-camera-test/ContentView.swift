@@ -37,145 +37,211 @@ struct CameraPreview: UIViewRepresentable {
 class CameraViewModel: NSObject, ObservableObject {
     let session = AVCaptureSession()
     private let output = AVCapturePhotoOutput()
-    private let videoOutput = AVCaptureVideoDataOutput()
-    private let referenceImage: UIImage
+    private let referenceImage: UIImage?
     private var guideRect: CGRect = .zero
     private let context = CIContext()
-    private var lastFrameTime: Date = Date()
-    private let minimumFrameInterval: TimeInterval = 0.1 // 100ms between analyses
-    
-    // Pattern matching parameters
-    private var imageMatchThreshold: Float = 0.15  // Lower threshold for ORB matching (15% feature matches)
-    private var recentMatches: [Float] = []
-    private let matchBufferSize = 10
+    private var currentDelegate: PhotoCaptureDelegate?
     
     @Published var isCameraAuthorized = false
     @Published var showPermissionAlert = false
     @Published var capturedImage: UIImage?
-    @Published var showCapturedImage = false
-    @Published var isMatchingTarget = false
+    @Published var previewImage: UIImage?
     @Published var matchQuality: Float = 0.0
+    @Published var lastMatchDetails: [String: Any]?
+    @Published var isAnalyzing = false
+    @Published var isProcessing = false
     
     override init() {
-        // Load the reference image
-        guard let image = UIImage(named: "reference_image") else {
-            fatalError("Reference image not found")
-        }
-        self.referenceImage = image
+        print("CameraViewModel: Initializing...")
+        self.referenceImage = UIImage(named: "reference_image")
         super.init()
+        
+        guard referenceImage != nil else {
+            print("Error: Reference image not found")
+            return
+        }
+        
         checkCameraPermission()
     }
     
     private func checkCameraPermission() {
+        print("Checking camera permission...")
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
+            print("Camera already authorized")
             setupCamera()
             isCameraAuthorized = true
         case .notDetermined:
+            print("Requesting camera permission...")
             AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
                 DispatchQueue.main.async {
                     if granted {
+                        print("Camera permission granted")
                         self?.setupCamera()
                         self?.isCameraAuthorized = true
                     } else {
+                        print("Camera permission denied")
                         self?.showPermissionAlert = true
                     }
                 }
             }
-        case .denied, .restricted:
+        case .denied:
+            print("Camera permission denied")
+            showPermissionAlert = true
+        case .restricted:
+            print("Camera access restricted")
             showPermissionAlert = true
         @unknown default:
+            print("Unknown camera permission status")
             showPermissionAlert = true
         }
     }
     
     private func setupCamera() {
+        print("Setting up camera...")
         session.beginConfiguration()
         
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
-              let input = try? AVCaptureDeviceInput(device: device),
-              session.canAddInput(input),
-              session.canAddOutput(output),
-              session.canAddOutput(videoOutput) else {
-            print("Error setting up camera input/output")
+        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
+            print("Failed to get camera device")
             return
         }
         
-        session.addInput(input)
-        session.addOutput(output)
-        session.addOutput(videoOutput)
-        
-        videoOutput.setSampleBufferDelegate(self, queue: DispatchQueue(label: "videoQueue"))
-        videoOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
-        
-        session.commitConfiguration()
-        
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            self?.session.startRunning()
+        do {
+            let input = try AVCaptureDeviceInput(device: device)
+            guard session.canAddInput(input) else {
+                print("Cannot add camera input")
+                return
+            }
+            guard session.canAddOutput(output) else {
+                print("Cannot add photo output")
+                return
+            }
+            
+            session.addInput(input)
+            session.addOutput(output)
+            
+            // Configure output settings
+            if output.availablePhotoCodecTypes.contains(.jpeg) {
+                output.maxPhotoQualityPrioritization = .quality
+            }
+            
+            print("Camera setup successful")
+            session.commitConfiguration()
+            
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                print("Starting camera session...")
+                self?.session.startRunning()
+                print("Camera session started")
+            }
+        } catch {
+            print("Error setting up camera: \(error.localizedDescription)")
         }
     }
     
-    func capturePhoto() {
-        let settings = AVCapturePhotoSettings()
-        output.capturePhoto(with: settings, delegate: self)
+    func captureAndAnalyze(completion: @escaping (Float) -> Void) {
+        print("CameraViewModel: Starting capture process")
+        guard !isProcessing else {
+            print("CameraViewModel: Already processing, ignoring tap")
+            return
+        }
+        
+        guard session.isRunning else {
+            print("CameraViewModel: Session not running")
+            return
+        }
+        
+        isProcessing = true
+        
+        let settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])
+        settings.photoQualityPrioritization = .quality
+        
+        print("CameraViewModel: Configuring photo settings")
+        
+        // Create and retain the delegate
+        let delegate = PhotoCaptureDelegate(guideRect: guideRect) { [weak self] image in
+            print("CameraViewModel: Photo capture completed")
+            guard let self = self else {
+                print("CameraViewModel: Self is nil")
+                return
+            }
+            
+            // Clear the retained delegate
+            self.currentDelegate = nil
+            
+            if let image = image {
+                print("CameraViewModel: Image captured successfully")
+                DispatchQueue.main.async {
+                    self.previewImage = image
+                    self.capturedImage = image
+                    self.isProcessing = false
+                    self.isAnalyzing = true
+                    
+                    // Start analysis immediately
+                    self.analyzeImage(image, completion: completion)
+                }
+            } else {
+                print("CameraViewModel: Failed to capture image")
+                DispatchQueue.main.async {
+                    self.isProcessing = false
+                    completion(0.0)
+                }
+            }
+        }
+        
+        // Store the delegate
+        currentDelegate = delegate
+        
+        print("CameraViewModel: Starting photo capture")
+        output.capturePhoto(with: settings, delegate: delegate)
+    }
+    
+    private func analyzeImage(_ image: UIImage, completion: @escaping (Float) -> Void) {
+        print("CameraViewModel: Starting image analysis")
+        guard let referenceImage = self.referenceImage else {
+            print("CameraViewModel: Reference image not available")
+            DispatchQueue.main.async {
+                self.isAnalyzing = false
+                completion(0.0)
+            }
+            return
+        }
+        
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            print("CameraViewModel: Comparing images with OpenCV")
+            guard let self = self else { return }
+            
+            autoreleasepool {
+                if let result = OpenCVWrapper.compareImages(image, with: referenceImage) {
+                    print("CameraViewModel: Comparison completed")
+                    let score = (result["score"] as? NSNumber)?.floatValue ?? 0.0
+                    let normalizedScore = score / 100.0
+                    
+                    // Convert dictionary to [String: Any]
+                    let stringDict = result.reduce(into: [String: Any]()) { dict, pair in
+                        if let key = pair.key as? String {
+                            dict[key] = pair.value
+                        }
+                    }
+                    
+                    DispatchQueue.main.async {
+                        self.matchQuality = normalizedScore
+                        self.lastMatchDetails = stringDict
+                        self.isAnalyzing = false
+                        completion(normalizedScore)
+                    }
+                } else {
+                    print("CameraViewModel: Comparison failed")
+                    DispatchQueue.main.async {
+                        self.isAnalyzing = false
+                        completion(0.0)
+                    }
+                }
+            }
+        }
     }
     
     func updateGuideRect(rect: CGRect) {
         guideRect = rect
-    }
-    
-    private func analyzeFrame(_ sampleBuffer: CMSampleBuffer) {
-        let now = Date()
-        guard now.timeIntervalSince(lastFrameTime) >= minimumFrameInterval else { return }
-        lastFrameTime = now
-        
-        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer),
-              let cgImage = context.createCGImage(CIImage(cvPixelBuffer: pixelBuffer), from: CGRect(x: 0, y: 0, width: CVPixelBufferGetWidth(pixelBuffer), height: CVPixelBufferGetHeight(pixelBuffer))) else {
-            return
-        }
-        
-        // Convert guide rect to image coordinates
-        let imageWidth = CGFloat(cgImage.width)
-        let imageHeight = CGFloat(cgImage.height)
-        let scaleX = imageWidth / UIScreen.main.bounds.width
-        let scaleY = imageHeight / UIScreen.main.bounds.height
-        
-        let analysisRect = CGRect(
-            x: guideRect.minX * scaleX,
-            y: guideRect.minY * scaleY,
-            width: guideRect.width * scaleX,
-            height: guideRect.height * scaleY
-        )
-        
-        // Extract the region of interest from the camera frame
-        guard let croppedImage = cropImage(cgImage, to: analysisRect) else {
-            DispatchQueue.main.async {
-                self.matchQuality = 0.0
-                self.isMatchingTarget = false
-            }
-            return
-        }
-        
-        // Process image comparison on background queue
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-            
-            // Compare with reference image
-            let matchScore = self.compareWithReference(croppedImage)
-            
-            // Update smoothed match quality on main queue
-            DispatchQueue.main.async {
-                self.recentMatches.append(matchScore)
-                if self.recentMatches.count > self.matchBufferSize {
-                    self.recentMatches.removeFirst()
-                }
-                
-                let smoothedQuality = self.recentMatches.reduce(0, +) / Float(self.recentMatches.count)
-                
-                self.matchQuality = smoothedQuality
-                self.isMatchingTarget = smoothedQuality >= self.imageMatchThreshold
-            }
-        }
     }
     
     private func cropImage(_ image: CGImage, to rect: CGRect) -> CGImage? {
@@ -191,7 +257,7 @@ class CameraViewModel: NSObject, ObservableObject {
     }
     
     private func compareWithReference(_ croppedImage: CGImage) -> Float {
-        guard let referenceCGImage = referenceImage.cgImage else { return 0.0 }
+        guard let referenceCGImage = referenceImage?.cgImage else { return 0.0 }
         
         // Convert CGImages to UIImages for OpenCV processing
         let croppedUIImage = UIImage(cgImage: croppedImage)
@@ -367,33 +433,51 @@ class CameraViewModel: NSObject, ObservableObject {
     }
 }
 
-extension CameraViewModel: AVCapturePhotoCaptureDelegate {
+class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
+    private let guideRect: CGRect
+    private let completion: (UIImage?) -> Void
+    
+    init(guideRect: CGRect, completion: @escaping (UIImage?) -> Void) {
+        print("PhotoCaptureDelegate: Initializing")
+        self.guideRect = guideRect
+        self.completion = completion
+        super.init()
+    }
+    
     func photoOutput(_ output: AVCapturePhotoOutput,
                     didFinishProcessingPhoto photo: AVCapturePhoto,
                     error: Error?) {
+        print("PhotoCaptureDelegate: Processing photo output")
+        
         if let error = error {
-            print("Error capturing photo: \(error.localizedDescription)")
+            print("PhotoCaptureDelegate: Error capturing photo - \(error.localizedDescription)")
+            completion(nil)
             return
         }
         
-        if let data = photo.fileDataRepresentation(),
-           let image = UIImage(data: data) {
-            DispatchQueue.main.async { [weak self] in
-                self?.capturedImage = image
-                self?.showCapturedImage = true
-            }
+        print("PhotoCaptureDelegate: Getting photo data")
+        guard let imageData = photo.fileDataRepresentation() else {
+            print("PhotoCaptureDelegate: Failed to get image data")
+            completion(nil)
+            return
         }
-    }
-}
-
-extension CameraViewModel: AVCaptureVideoDataOutputSampleBufferDelegate {
-    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        analyzeFrame(sampleBuffer)
+        
+        print("PhotoCaptureDelegate: Creating UIImage")
+        guard let image = UIImage(data: imageData) else {
+            print("PhotoCaptureDelegate: Failed to create UIImage")
+            completion(nil)
+            return
+        }
+        
+        print("PhotoCaptureDelegate: Processing successful, calling completion")
+        completion(image)
     }
 }
 
 struct CameraView: View {
     @StateObject private var viewModel = CameraViewModel()
+    @State private var showingResults = false
+    @State private var isButtonPressed = false
     
     var body: some View {
         ZStack {
@@ -403,10 +487,17 @@ struct CameraView: View {
             
             if viewModel.isCameraAuthorized {
                 VStack {
-                    // Camera preview in a box
+                    // Camera preview or captured image
                     ZStack {
-                        CameraPreview(session: viewModel.session)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        if let previewImage = viewModel.previewImage {
+                            Image(uiImage: previewImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else {
+                            CameraPreview(session: viewModel.session)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
                         
                         GeometryReader { geometry in
                             let maxWidth = geometry.size.width * 0.8
@@ -415,19 +506,10 @@ struct CameraView: View {
                             let centerY = geometry.size.height / 2
                             
                             ZStack(alignment: .center) {
-                                // Match quality indicator
-                                Text(matchQualityText)
-                                    .foregroundColor(matchQualityColor)
-                                    .font(.headline)
-                                    .padding(8)
-                                    .background(Color.black.opacity(0.6))
-                                    .cornerRadius(8)
-                                    .offset(y: -(height / 2 + 40)) // Position above rectangle
-                                
                                 // Guide rectangle
                                 Rectangle()
                                     .strokeBorder(
-                                        viewModel.isMatchingTarget ? Color.green : Color.gray.opacity(0.8),
+                                        viewModel.isAnalyzing ? Color.yellow : Color.white,
                                         style: StrokeStyle(
                                             lineWidth: 2,
                                             dash: [5]
@@ -452,6 +534,25 @@ struct CameraView: View {
                                 ))
                             }
                         }
+                        
+                        // Status overlay
+                        VStack {
+                            if viewModel.isProcessing {
+                                Text("Capturing...")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .padding()
+                                    .background(Color.black.opacity(0.5))
+                                    .cornerRadius(10)
+                            } else if viewModel.isAnalyzing {
+                                Text("Analyzing...")
+                                    .font(.headline)
+                                    .foregroundColor(.yellow)
+                                    .padding()
+                                    .background(Color.black.opacity(0.5))
+                                    .cornerRadius(10)
+                            }
+                        }
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 20))
                     .padding(.horizontal, 20)
@@ -459,16 +560,74 @@ struct CameraView: View {
                     
                     Spacer()
                     
-                    // Capture button
-                    Button(action: {
-                        viewModel.capturePhoto()
-                    }) {
-                        Circle()
-                            .fill(Color.white)
-                            .frame(width: 70, height: 70)
-                            .overlay(Circle().stroke(Color.gray, lineWidth: 2))
+                    HStack {
+                        // Reset button (only show when preview is visible)
+                        if viewModel.previewImage != nil {
+                            Button {
+                                viewModel.previewImage = nil
+                                viewModel.isAnalyzing = false
+                            } label: {
+                                Image(systemName: "arrow.counterclockwise")
+                                    .font(.title)
+                                    .foregroundColor(.white)
+                                    .frame(width: 50, height: 50)
+                                    .background(Color.gray)
+                                    .clipShape(Circle())
+                            }
+                            .padding(.leading, 40)
+                        }
+                        
+                        Spacer()
+                        
+                        // Capture button
+                        Button {
+                            print("Button tapped")
+                            // Trigger haptic feedback
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                            impactFeedback.impactOccurred()
+                            
+                            // Visual button press animation
+                            withAnimation(.easeInOut(duration: 0.1)) {
+                                isButtonPressed = true
+                            }
+                            
+                            // Reset button press state after a short delay
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                withAnimation {
+                                    isButtonPressed = false
+                                }
+                            }
+                            
+                            viewModel.captureAndAnalyze { score in
+                                print("Analysis complete with score: \(score)")
+                                showingResults = true
+                            }
+                        } label: {
+                            Circle()
+                                .fill(viewModel.isAnalyzing ? Color.yellow : Color.white)
+                                .frame(width: 70, height: 70)
+                                .scaleEffect(isButtonPressed ? 0.9 : 1.0)
+                                .overlay(Circle().stroke(Color.gray, lineWidth: 2))
+                                .overlay(
+                                    Group {
+                                        if viewModel.isAnalyzing || viewModel.isProcessing {
+                                            ProgressView()
+                                                .progressViewStyle(CircularProgressViewStyle(tint: .black))
+                                                .scaleEffect(1.5)
+                                        }
+                                    }
+                                )
+                                .animation(.easeInOut(duration: 0.2), value: viewModel.isAnalyzing)
+                                .animation(.easeInOut(duration: 0.2), value: viewModel.isProcessing)
+                        }
+                        .disabled(viewModel.isAnalyzing || viewModel.isProcessing)
+                        .padding(.trailing, viewModel.previewImage != nil ? 40 : 0)
+                        .padding(.bottom, 50)
+                        
+                        if viewModel.previewImage == nil {
+                            Spacer()
+                        }
                     }
-                    .padding(.bottom, 50)
                 }
             } else {
                 VStack {
@@ -494,46 +653,98 @@ struct CameraView: View {
         } message: {
             Text("This app needs camera access to take photos. Please enable it in Settings.")
         }
-        .sheet(isPresented: $viewModel.showCapturedImage) {
-            if let image = viewModel.capturedImage {
-                VStack {
-                    Image(uiImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: 15))
-                        .padding()
+        .sheet(isPresented: $showingResults) {
+            ResultView(matchQuality: viewModel.matchQuality,
+                      matchDetails: viewModel.lastMatchDetails,
+                      capturedImage: viewModel.capturedImage)
+        }
+    }
+}
+
+struct ResultView: View {
+    let matchQuality: Float
+    let matchDetails: [String: Any]?
+    let capturedImage: UIImage?
+    @Environment(\.presentationMode) var presentationMode
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 20) {
+                    Group {
+                        if let capturedImage = capturedImage {
+                            Image(uiImage: capturedImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(maxHeight: 200)
+                                .clipShape(RoundedRectangle(cornerRadius: 15))
+                        } else {
+                            Text("No image captured")
+                                .foregroundColor(.gray)
+                                .frame(height: 200)
+                        }
+                    }
+                    .padding(.horizontal)
                     
-                    Button("Done") {
-                        viewModel.showCapturedImage = false
+                    VStack(alignment: .leading, spacing: 15) {
+                        ResultRow(title: "Match Score", 
+                                value: String(format: "%.1f%%", matchQuality * 100),
+                                color: matchScoreColor)
+                        
+                        if let details = matchDetails {
+                            ResultRow(title: "Matches Found",
+                                    value: "\(details["matches"] as? Int ?? 0)")
+                            
+                            ResultRow(title: "Structural Similarity",
+                                    value: String(format: "%.1f%%", 
+                                                (details["structuralSimilarity"] as? Double ?? 0) * 100))
+                            
+                            ResultRow(title: "Spatial Score",
+                                    value: String(format: "%.1f%%", 
+                                                (details["spatialScore"] as? Double ?? 0) * 100))
+                            
+                            if let error = details["error"] as? String {
+                                Text(error)
+                                    .foregroundColor(.red)
+                                    .padding()
+                            }
+                        }
                     }
                     .padding()
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
-                .background(Color.black)
             }
+            .navigationTitle("Analysis Results")
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarItems(trailing: Button("Done") {
+                presentationMode.wrappedValue.dismiss()
+            })
         }
     }
     
-    private var matchQualityText: String {
-        let percentage = Int(viewModel.matchQuality * 100)
-        if viewModel.isMatchingTarget {
-            return "✓ Pattern Matched! (\(percentage)%)"
-        } else if percentage > 0 {
-            return "Align LCD Screen (\(percentage)%)"
-        } else {
-            return "Align LCD Screen"
-        }
-    }
-    
-    private var matchQualityColor: Color {
-        if viewModel.isMatchingTarget {
+    private var matchScoreColor: Color {
+        if matchQuality >= 0.7 {
             return .green
-        } else if viewModel.matchQuality > 0.5 {
+        } else if matchQuality >= 0.4 {
             return .yellow
         } else {
-            return .gray
+            return .red
+        }
+    }
+}
+
+struct ResultRow: View {
+    let title: String
+    let value: String
+    var color: Color = .primary
+    
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(.headline)
+            Spacer()
+            Text(value)
+                .foregroundColor(color)
+                .font(.body.monospaced())
         }
     }
 }
